@@ -5,5 +5,12 @@
     "priority": "high",
     "status": "done",
     "dependencies": []
+  },
+  {
+    "id": "b7e95499-a313-4af5-8b2f-291016168fa6",
+    "description": "Add Windows-specific instructions to README.md including: 1) Path format differences (backslashes), 2) VSCode settings location on Windows, 3) Node.js installation via nvm-windows, 4) Windows-specific troubleshooting steps",
+    "priority": "high",
+    "status": "done",
+    "dependencies": []
   }
 ]

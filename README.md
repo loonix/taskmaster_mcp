@@ -173,6 +173,59 @@ After adding the configuration, you can use the tools in any mode via the `use_m
 </arguments>
 </use_mcp_tool>
 
+## Windows-Specific Instructions
+
+### Installation
+1. Install nvm-windows from https://github.com/coreybutler/nvm-windows/releases
+2. Open a new PowerShell terminal and install Node.js v20:
+   ```powershell
+   nvm install 20.11.0
+   nvm use 20.11.0
+   ```
+
+### Configuration
+The VSCode settings location on Windows is different:
+```
+%APPDATA%\Code\User\globalStorage\rooveterinaryinc.roo-cline\settings\mcp_settings.json
+```
+
+When configuring paths in mcp_settings.json, use Windows path format:
+```json
+{
+  "mcpServers": {
+    "ai-taskmaster": {
+      "command": "C:\\Users\\YourUsername\\AppData\\Roaming\\nvm\\v20.11.0\\node.exe",
+      "args": [
+        "C:\\path\\to\\taskmaster_mcp\\build\\index.js"
+      ],
+      "stdio": [
+        "pipe",
+        "pipe",
+        "pipe"
+      ],
+      "cwd": "C:\\path\\to\\taskmaster_mcp",
+      "transportType": "stdio",
+      "description": "Task management MCP server that provides tools for managing tasks"
+    }
+  }
+}
+```
+
+### Windows-Specific Troubleshooting
+- If you get permission errors, run PowerShell as Administrator
+- For port conflicts on Windows:
+  ```powershell
+  # Find process using port 6277
+  netstat -ano | findstr :6277
+  # Kill the process
+  taskkill /PID <PID> /F
+  ```
+- Use `where node` to verify the correct Node.js version is in your PATH
+- If you have issues with global npm installations, try:
+  ```powershell
+  npm config set prefix "C:\Users\YourUsername\AppData\Roaming\npm"
+  ```
+
 ## Troubleshooting
 
 ### Node.js Version Issues
