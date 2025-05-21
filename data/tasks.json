@@ -1,0 +1,16 @@
+[
+  {
+    "id": "d1df9eef-1cc9-4669-b27d-5ffdb1fef6f2",
+    "description": "Test the MCP server functionality",
+    "priority": "high",
+    "status": "pending",
+    "dependencies": []
+  },
+  {
+    "id": "9f75cad9-7652-4dfe-8b9f-8e5c2d76b4b5",
+    "description": "Create a frontend for the todo list",
+    "priority": "high",
+    "status": "in-progress",
+    "dependencies": []
+  }
+]
