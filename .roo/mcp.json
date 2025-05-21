@@ -1,0 +1,78 @@
+{
+  "mcpServers": {
+    "ai-taskmaster": {
+      "command": "node build/index.js",
+      "transportType": "stdio",
+      "description": "Task management MCP server that provides tools for managing tasks",
+      "capabilities": {
+        "tools": {
+          "addTask": {
+            "description": "Add a new task",
+            "inputSchema": {
+              "type": "object",
+              "required": ["description"],
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "Task description"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["high", "medium", "low"],
+                  "description": "Task priority"
+                }
+              }
+            }
+          },
+          "listTasks": {
+            "description": "List all tasks",
+            "inputSchema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "updateTask": {
+            "description": "Update a task",
+            "inputSchema": {
+              "type": "object",
+              "required": ["id"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Task ID"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "New task description"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["high", "medium", "low"],
+                  "description": "New task priority"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "in-progress", "done"],
+                  "description": "New task status"
+                }
+              }
+            }
+          },
+          "deleteTask": {
+            "description": "Delete a task",
+            "inputSchema": {
+              "type": "object",
+              "required": ["id"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Task ID"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

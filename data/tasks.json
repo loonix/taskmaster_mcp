@@ -1,16 +1,9 @@
 [
   {
-    "id": "d1df9eef-1cc9-4669-b27d-5ffdb1fef6f2",
-    "description": "Test the MCP server functionality",
+    "id": "b4f9bbf2-a85d-480e-bd31-507526ac26dc",
+    "description": "Update README.md with troubleshooting steps: 1) Correct Node.js version requirement (v20+), 2) Proper stdio configuration in mcp_settings.json, 3) Port conflict resolution, 4) VSCode integration path correction",
     "priority": "high",
-    "status": "pending",
-    "dependencies": []
-  },
-  {
-    "id": "9f75cad9-7652-4dfe-8b9f-8e5c2d76b4b5",
-    "description": "Create a frontend for the todo list",
-    "priority": "high",
-    "status": "in-progress",
+    "status": "done",
     "dependencies": []
   }
 ]
