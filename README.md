@@ -2,6 +2,15 @@
 
 This is a Model Context Protocol (MCP) server that provides task management functionality.
 
+Models Tested:
+- Claude 3.5
+- mychen76/qwen3_cline_roocode:32b (local with ollama)
+
+![image](https://github.com/user-attachments/assets/8568de5b-c7d4-4474-9a87-57492c8d334d)
+![image](https://github.com/user-attachments/assets/543c305e-5deb-4d03-878b-951283635f06)
+![image](https://github.com/user-attachments/assets/20f6b7c9-1ba3-42fe-89a2-03e3472a59e2)
+
+
 ## Requirements
 
 - Node.js v20 or higher (tested with v20.11.0)
