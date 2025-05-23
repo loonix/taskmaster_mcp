@@ -1,5 +1,7 @@
 # Task Manager MCP Server
 
+![image](https://github.com/user-attachments/assets/0b27048a-822d-4c60-a2cb-5bc2415e029f)
+
 This is a Model Context Protocol (MCP) server that provides task management functionality.
 
 Models Tested:
