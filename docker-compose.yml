@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  taskmaster:
+    build: .
+    ports:
+      - "6274:6274"  # MCP Inspector UI
+      - "6277:6277"  # Proxy Server
+    volumes:
+      - ./data:/app/data  # Mount data directory for persistent storage
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "6274"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
