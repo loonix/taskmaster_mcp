@@ -7,27 +7,37 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY src ./src
+# Create non-root user first
+RUN useradd -m taskmaster && \
+    mkdir -p /app/data && \
+    chown -R taskmaster:taskmaster /app
+
+# Setup npm for non-root user
+ENV NPM_CONFIG_PREFIX=/home/taskmaster/.npm-global
+ENV PATH=/home/taskmaster/.npm-global/bin:$PATH
+RUN mkdir -p /home/taskmaster/.npm-global && \
+    chown -R taskmaster:taskmaster /home/taskmaster/.npm-global
+
+# Switch to non-root user for npm operations
+USER taskmaster
+
+# Install global packages
+RUN npm install -g @modelcontextprotocol/inspector
+
+# Copy project files
+COPY --chown=taskmaster:taskmaster package*.json ./
+COPY --chown=taskmaster:taskmaster tsconfig.json ./
+COPY --chown=taskmaster:taskmaster src ./src
+COPY --chown=taskmaster:taskmaster data ./data
 
 # Install dependencies and build
 RUN npm ci && \
     npm run build && \
-    npm prune --production && \
-    npm install -g @modelcontextprotocol/inspector
+    npm prune --production
 
-# Create data directory and non-root user
-RUN mkdir -p /app/data && \
-    useradd -m taskmaster && \
-    chown -R taskmaster:taskmaster /app
-
-# Copy and setup entrypoint script
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh && \
-    chown taskmaster:taskmaster /docker-entrypoint.sh
-
-USER taskmaster
+# Setup entrypoint
+COPY --chown=taskmaster:taskmaster docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 6274
 EXPOSE 6277

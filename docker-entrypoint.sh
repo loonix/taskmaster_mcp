@@ -1,24 +1,21 @@
 #!/bin/sh
 set -e
 
-# Start the MCP server
-node build/index.js &
+# Function to cleanup processes
+cleanup() {
+    kill $MCP_PID 2>/dev/null || true
+    exit 0
+}
+
+# Setup signal trapping
+trap cleanup EXIT INT TERM
+
+# Start the MCP server and save its output
+node build/index.js 2>&1 | tee /tmp/mcp.log &
 MCP_PID=$!
 
-# Wait a moment for the server to start
+# Wait for the server to initialize
 sleep 2
 
-# Start the MCP inspector
-npx @modelcontextprotocol/inspector --host=0.0.0.0 build/index.js &
-INSPECTOR_PID=$!
-
-# Trap interrupts and exit signals to properly terminate both processes
-trap "kill $MCP_PID $INSPECTOR_PID 2>/dev/null" EXIT TERM INT
-
-# Keep the script running
-while kill -0 $MCP_PID 2>/dev/null && kill -0 $INSPECTOR_PID 2>/dev/null; do
-    sleep 1
-done
-
-# If we get here, one of the processes died
-exit 1
+# Start the inspector in the foreground
+/usr/local/bin/mcp-inspector build/index.js --host 0.0.0.0
