@@ -60,7 +60,7 @@ MCP_PID=$!
 wait_for_port 6277
 
 echo "Starting MCP Inspector..."
-/home/taskmaster/.npm-global/bin/mcp-inspector --host 0.0.0.0 build/index.js &
+node ./node_modules/@modelcontextprotocol/inspector/bin/mcp-inspector.js --host 0.0.0.0 build/index.js &
 INSPECTOR_PID=$!
 
 # Wait for Inspector port to be ready

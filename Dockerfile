@@ -16,15 +16,10 @@ RUN useradd -m taskmaster && \
     chmod 755 /app/data && \
     chmod 644 /app/data/tasks.json
 
-# Setup npm for non-root user with specific config
-ENV NPM_CONFIG_PREFIX=/home/taskmaster/.npm-global
-ENV PATH="/home/taskmaster/.npm-global/bin:/app/node_modules/.bin:${PATH}"
-ENV DOCKER_ENV=true
+# Set environment variables
 ENV NODE_ENV=production
-
-# Create and configure npm directories
-RUN mkdir -p /home/taskmaster/.npm-global && \
-    chown -R taskmaster:taskmaster /home/taskmaster/.npm-global
+ENV DOCKER_ENV=true
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 # Switch to non-root user for npm operations
 USER taskmaster
@@ -33,16 +28,17 @@ USER taskmaster
 COPY --chown=taskmaster:taskmaster package*.json ./
 COPY --chown=taskmaster:taskmaster tsconfig.json ./
 
-# Install all dependencies for building
-RUN npm ci && \
-    npm install -g @modelcontextprotocol/inspector
+# Install dependencies and build
+RUN npm ci --only=production && \
+    npm install --no-save typescript@5.3.3 @types/node@20.11.24 @types/uuid@9.0.8 && \
+    npm cache clean --force
 
 # Copy source files
 COPY --chown=taskmaster:taskmaster src ./src
 
 # Build the application
-RUN NODE_ENV=development npm run build && \
-    npm prune --production
+RUN npm run build && \
+    rm -rf /app/node_modules/typescript /app/node_modules/@types
 
 # Setup entrypoint
 COPY --chown=taskmaster:taskmaster docker-entrypoint.sh /docker-entrypoint.sh
