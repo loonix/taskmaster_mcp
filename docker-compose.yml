@@ -5,7 +5,7 @@ services:
     build: .
     ports:
       - "0.0.0.0:6274:6274"  # MCP Inspector UI
-      - "0.0.0.0:6277:6277"  # Proxy Server
+      - "0.0.0.0:6277:6277"  # SSE Transport
     volumes:
       - taskdata:/app/data  # Use named volume for data
     healthcheck:
@@ -17,7 +17,16 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - DOCKER_ENV=true
+      - MCP_INSPECTOR_HOST=0.0.0.0
+      - MCP_SSE_HOST=0.0.0.0
     user: taskmaster  # Explicitly set the user
+    networks:
+      - mcp_network
+
+networks:
+  mcp_network:
+    driver: bridge
 
 volumes:
   taskdata:  # Define named volume for persistence

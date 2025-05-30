@@ -19,20 +19,26 @@ RUN useradd -m taskmaster && \
 # Setup npm for non-root user
 ENV NPM_CONFIG_PREFIX=/home/taskmaster/.npm-global
 ENV PATH="/home/taskmaster/.npm-global/bin:/app/node_modules/.bin:${PATH}"
+ENV DOCKER_ENV=true
+
 RUN mkdir -p /home/taskmaster/.npm-global && \
     chown -R taskmaster:taskmaster /home/taskmaster/.npm-global
 
 # Switch to non-root user for npm operations
 USER taskmaster
 
-# Copy project files
+# Copy package files first for better caching
 COPY --chown=taskmaster:taskmaster package*.json ./
 COPY --chown=taskmaster:taskmaster tsconfig.json ./
+
+# Install dependencies including devDependencies for TypeScript compilation
+RUN npm ci
+
+# Copy source files
 COPY --chown=taskmaster:taskmaster src ./src
 
-# Install dependencies, build, and setup inspector
-RUN npm ci && \
-    npm run build && \
+# Build the application
+RUN npm run build && \
     npm install @modelcontextprotocol/inspector && \
     npm install -g @modelcontextprotocol/inspector && \
     npm prune --production
