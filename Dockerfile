@@ -17,7 +17,6 @@ RUN useradd -m taskmaster && \
     chmod 644 /app/data/tasks.json
 
 # Set environment variables
-ENV NODE_ENV=production
 ENV DOCKER_ENV=true
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
@@ -28,17 +27,14 @@ USER taskmaster
 COPY --chown=taskmaster:taskmaster package*.json ./
 COPY --chown=taskmaster:taskmaster tsconfig.json ./
 
-# Install dependencies and build
-RUN npm ci --only=production && \
-    npm install --no-save typescript@5.3.3 @types/node@20.11.24 @types/uuid@9.0.8 && \
-    npm cache clean --force
+# Install all dependencies
+RUN npm ci
 
 # Copy source files
 COPY --chown=taskmaster:taskmaster src ./src
 
 # Build the application
-RUN npm run build && \
-    rm -rf /app/node_modules/typescript /app/node_modules/@types
+RUN npm run build
 
 # Setup entrypoint
 COPY --chown=taskmaster:taskmaster docker-entrypoint.sh /docker-entrypoint.sh
