@@ -9,11 +9,11 @@ services:
     volumes:
       - ./data:/app/data  # Mount data directory for persistent storage
     healthcheck:
-      test: ["CMD", "nc", "-z", "0.0.0.0", "6274"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "nc -z 0.0.0.0 6274 && nc -z 0.0.0.0 6277"]
+      interval: 10s
+      timeout: 5s
       retries: 3
+      start_period: 10s
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - HOST=0.0.0.0  # Make the server listen on all interfaces

@@ -1,24 +1,24 @@
 #!/bin/sh
 set -e
 
-# Start the MCP server in the background
+# Start the MCP server
 node build/index.js &
 MCP_PID=$!
 
 # Wait a moment for the server to start
 sleep 2
 
-# Start the MCP inspector with explicit host binding
+# Start the MCP inspector
 npx @modelcontextprotocol/inspector --host=0.0.0.0 build/index.js &
 INSPECTOR_PID=$!
 
-# Wait for either process to exit
-wait -n
+# Trap interrupts and exit signals to properly terminate both processes
+trap "kill $MCP_PID $INSPECTOR_PID 2>/dev/null" EXIT TERM INT
 
-# If we get here, one of the processes exited
-# Kill the other process
-kill $MCP_PID 2>/dev/null || true
-kill $INSPECTOR_PID 2>/dev/null || true
+# Keep the script running
+while kill -0 $MCP_PID 2>/dev/null && kill -0 $INSPECTOR_PID 2>/dev/null; do
+    sleep 1
+done
 
-# Exit with the same code as the failed process
-exit $?
+# If we get here, one of the processes died
+exit 1
