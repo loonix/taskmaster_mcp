@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
+// Redirect console.log to stderr to keep stdout clean for JSON messages
+const log = console.log;
+console.log = (...args) => {
+  console.error(...args);
+};
+
+// Define available tools
 interface Tool {
   id: string;
   name: string;
@@ -21,20 +28,23 @@ const tools: Tool[] = [
 ];
 
 async function main() {
-  const transport = new StdioServerTransport();
-
+  log("Task Manager MCP server running on stdio");
+  
   process.stdin.setEncoding('utf-8');
-  process.stdin.on('data', async (data: string) => {
+  process.stdin.on('data', (data: string) => {
     try {
-      const request = JSON.parse(data);
+      const message = JSON.parse(data);
+      const { method, params, id } = message;
       const response = {
         jsonrpc: '2.0',
-        id: request.id
+        id
       };
 
-      switch (request.method) {
+      let result;
+
+      switch (method) {
         case 'initialize':
-          process.stdout.write(JSON.stringify({
+          result = {
             ...response,
             result: {
               protocolVersion: '2024-11-05',
@@ -46,64 +56,66 @@ async function main() {
                 tools: {}
               }
             }
-          }) + '\n');
+          };
           break;
 
         case 'listTools':
-          process.stdout.write(JSON.stringify({
+          result = {
             ...response,
             result: { tools }
-          }) + '\n');
+          };
           break;
 
         case 'callTool':
-          const toolId = request.params?.toolId;
+          const toolId = params?.toolId;
           const tool = tools.find(t => t.id === toolId);
           
           if (!tool) {
-            process.stdout.write(JSON.stringify({
+            result = {
               ...response,
               error: {
                 code: -32601,
                 message: `Tool ${toolId} not found`
               }
-            }) + '\n');
+            };
             break;
           }
 
           switch (toolId) {
             case 'list-tasks':
-              process.stdout.write(JSON.stringify({
+              result = {
                 ...response,
                 result: { tasks: [] }
-              }) + '\n');
+              };
               break;
             case 'add-task':
-              process.stdout.write(JSON.stringify({
+              result = {
                 ...response,
                 result: { success: true }
-              }) + '\n');
+              };
               break;
             default:
-              process.stdout.write(JSON.stringify({
+              result = {
                 ...response,
                 error: {
                   code: -32601,
                   message: `Tool ${toolId} not implemented`
                 }
-              }) + '\n');
+              };
           }
           break;
 
         default:
-          process.stdout.write(JSON.stringify({
+          result = {
             ...response,
             error: {
               code: -32601,
-              message: `Method ${request.method} not found`
+              message: `Method ${method} not found`
             }
-          }) + '\n');
+          };
       }
+
+      process.stdout.write(JSON.stringify(result) + '\n');
     } catch (error: any) {
       process.stdout.write(JSON.stringify({
         jsonrpc: '2.0',
@@ -116,7 +128,10 @@ async function main() {
     }
   });
 
-  console.log("Task Manager MCP server running on stdio");
+  log("MCP server ready for messages");
 }
 
-main().catch(console.error);
+main().catch(error => {
+  log("Fatal error:", error);
+  process.exit(1);
+});
