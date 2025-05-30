@@ -4,15 +4,16 @@ services:
   taskmaster:
     build: .
     ports:
-      - "6274:6274"  # MCP Inspector UI
-      - "6277:6277"  # Proxy Server
+      - "0.0.0.0:6274:6274"  # MCP Inspector UI
+      - "0.0.0.0:6277:6277"  # Proxy Server
     volumes:
       - ./data:/app/data  # Mount data directory for persistent storage
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "6274"]
+      test: ["CMD", "nc", "-z", "0.0.0.0", "6274"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - HOST=0.0.0.0  # Make the server listen on all interfaces

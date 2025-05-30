@@ -13,7 +13,8 @@ COPY src ./src
 
 RUN npm ci && \
     npm run build && \
-    npm prune --production
+    npm prune --production && \
+    npm install -g @modelcontextprotocol/inspector
 
 # Create data directory and non-root user
 RUN mkdir -p /app/data && \
@@ -25,4 +26,7 @@ USER taskmaster
 EXPOSE 6274
 EXPOSE 6277
 
-CMD ["node", "build/index.js"]
+ENV HOST=0.0.0.0
+ENV MCP_INSPECTOR_HOST=0.0.0.0
+
+CMD ["sh", "-c", "mcp-inspector --host 0.0.0.0 build/index.js"]
