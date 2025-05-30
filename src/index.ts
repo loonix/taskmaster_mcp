@@ -1,252 +1,122 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  McpError,
-  ErrorCode
-} from '@modelcontextprotocol/sdk/types.js';
-import fs from 'fs/promises';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import { createServer } from 'http';
 
-interface Task {
+interface Tool {
   id: string;
+  name: string;
   description: string;
-  priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in-progress' | 'done';
-  dependencies: string[];
 }
 
-class TaskManagerServer {
-  private server: Server;
-  private tasksPath: string;
-
-  constructor() {
-    // Initialize MCP server
-    this.server = new Server(
-      {
-        name: 'ai-taskmaster',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
-
-    this.tasksPath = path.join(process.cwd(), 'data', 'tasks.json');
-    this.setupToolHandlers();
-    
-    // Error handling
-    this.server.onerror = (error) => console.error('[MCP Error]', error);
+const tools: Tool[] = [
+  {
+    id: 'list-tasks',
+    name: 'List Tasks',
+    description: 'Lists all tasks'
+  },
+  {
+    id: 'add-task',
+    name: 'Add Task',
+    description: 'Adds a new task'
   }
+];
 
-  private async ensureTasksFile() {
+async function main() {
+  const transport = new StdioServerTransport();
+
+  process.stdin.setEncoding('utf-8');
+  process.stdin.on('data', async (data: string) => {
     try {
-      await fs.access(this.tasksPath);
-    } catch {
-      await fs.mkdir(path.dirname(this.tasksPath), { recursive: true });
-      await fs.writeFile(this.tasksPath, JSON.stringify([], null, 2));
-    }
-  }
+      const request = JSON.parse(data);
+      const response = {
+        jsonrpc: '2.0',
+        id: request.id
+      };
 
-  private async loadTasks(): Promise<Task[]> {
-    await this.ensureTasksFile();
-    const data = await fs.readFile(this.tasksPath, 'utf8');
-    return JSON.parse(data);
-  }
-
-  private async saveTasks(tasks: Task[]) {
-    await fs.writeFile(this.tasksPath, JSON.stringify(tasks, null, 2));
-  }
-
-  private setupToolHandlers() {
-    // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: 'addTask',
-          description: 'Add a new task',
-          inputSchema: {
-            type: 'object',
-            required: ['description'],
-            properties: {
-              description: {
-                type: 'string',
-                description: 'Task description'
+      switch (request.method) {
+        case 'initialize':
+          process.stdout.write(JSON.stringify({
+            ...response,
+            result: {
+              protocolVersion: '2024-11-05',
+              serverInfo: {
+                name: 'ai-taskmaster',
+                version: '1.0.0'
               },
-              priority: {
-                type: 'string',
-                enum: ['high', 'medium', 'low'],
-                description: 'Task priority'
+              capabilities: {
+                tools: {}
               }
             }
-          }
-        },
-        {
-          name: 'listTasks',
-          description: 'List all tasks',
-          inputSchema: {
-            type: 'object',
-            properties: {}
-          }
-        },
-        {
-          name: 'updateTask',
-          description: 'Update a task',
-          inputSchema: {
-            type: 'object',
-            required: ['id'],
-            properties: {
-              id: {
-                type: 'string',
-                description: 'Task ID'
-              },
-              description: {
-                type: 'string',
-                description: 'New task description'
-              },
-              priority: {
-                type: 'string',
-                enum: ['high', 'medium', 'low'],
-                description: 'New task priority'
-              },
-              status: {
-                type: 'string',
-                enum: ['pending', 'in-progress', 'done'],
-                description: 'New task status'
+          }) + '\n');
+          break;
+
+        case 'listTools':
+          process.stdout.write(JSON.stringify({
+            ...response,
+            result: { tools }
+          }) + '\n');
+          break;
+
+        case 'callTool':
+          const toolId = request.params?.toolId;
+          const tool = tools.find(t => t.id === toolId);
+          
+          if (!tool) {
+            process.stdout.write(JSON.stringify({
+              ...response,
+              error: {
+                code: -32601,
+                message: `Tool ${toolId} not found`
               }
-            }
-          }
-        },
-        {
-          name: 'deleteTask',
-          description: 'Delete a task',
-          inputSchema: {
-            type: 'object',
-            required: ['id'],
-            properties: {
-              id: {
-                type: 'string',
-                description: 'Task ID'
-              }
-            }
-          }
-        }
-      ]
-    }));
-
-    // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-
-      try {
-        let response: any;
-
-        switch (name) {
-          case 'addTask': {
-            if (!args || typeof args !== 'object' || typeof args.description !== 'string') {
-              throw new McpError(ErrorCode.InvalidParams, 'Invalid task description');
-            }
-            const priority = args.priority as 'high' | 'medium' | 'low' || 'medium';
-            
-            const tasks = await this.loadTasks();
-            const newTask: Task = {
-              id: uuidv4(),
-              description: args.description,
-              priority,
-              status: 'pending',
-              dependencies: []
-            };
-            tasks.push(newTask);
-            await this.saveTasks(tasks);
-            response = newTask;
+            }) + '\n');
             break;
           }
 
-          case 'listTasks': {
-            response = await this.loadTasks();
-            break;
+          switch (toolId) {
+            case 'list-tasks':
+              process.stdout.write(JSON.stringify({
+                ...response,
+                result: { tasks: [] }
+              }) + '\n');
+              break;
+            case 'add-task':
+              process.stdout.write(JSON.stringify({
+                ...response,
+                result: { success: true }
+              }) + '\n');
+              break;
+            default:
+              process.stdout.write(JSON.stringify({
+                ...response,
+                error: {
+                  code: -32601,
+                  message: `Tool ${toolId} not implemented`
+                }
+              }) + '\n');
           }
+          break;
 
-          case 'updateTask': {
-            if (!args || typeof args !== 'object' || typeof args.id !== 'string') {
-              throw new McpError(ErrorCode.InvalidParams, 'Invalid task ID');
+        default:
+          process.stdout.write(JSON.stringify({
+            ...response,
+            error: {
+              code: -32601,
+              message: `Method ${request.method} not found`
             }
-
-            const tasks = await this.loadTasks();
-            const index = tasks.findIndex(t => t.id === args.id);
-            if (index === -1) {
-              throw new McpError(ErrorCode.InvalidParams, 'Task not found');
-            }
-            
-            const updates: Partial<Task> = {};
-            if (typeof args.description === 'string') updates.description = args.description;
-            if (args.priority && ['high', 'medium', 'low'].includes(args.priority as string)) {
-              updates.priority = args.priority as 'high' | 'medium' | 'low';
-            }
-            if (args.status && ['pending', 'in-progress', 'done'].includes(args.status as string)) {
-              updates.status = args.status as 'pending' | 'in-progress' | 'done';
-            }
-
-            tasks[index] = {
-              ...tasks[index],
-              ...updates
-            };
-            await this.saveTasks(tasks);
-            response = tasks[index];
-            break;
-          }
-
-          case 'deleteTask': {
-            if (!args || typeof args !== 'object' || typeof args.id !== 'string') {
-              throw new McpError(ErrorCode.InvalidParams, 'Invalid task ID');
-            }
-
-            const tasks = await this.loadTasks();
-            const filtered = tasks.filter(t => t.id !== args.id);
-            if (filtered.length === tasks.length) {
-              throw new McpError(ErrorCode.InvalidParams, 'Task not found');
-            }
-            await this.saveTasks(filtered);
-            response = { success: true };
-            break;
-          }
-
-          default:
-            throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(response, null, 2)
-            }
-          ]
-        };
-      } catch (error: any) {
-        if (error instanceof McpError) {
-          throw error;
-        }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error executing ${name}: ${error?.message || 'Unknown error'}`
-        );
+          }) + '\n');
       }
-    });
-  }
+    } catch (error: any) {
+      process.stdout.write(JSON.stringify({
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32700,
+          message: error.message || 'Parse error'
+        }
+      }) + '\n');
+    }
+  });
 
-  async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error('Task Manager MCP server running on stdio');
-  }
+  console.log("Task Manager MCP server running on stdio");
 }
 
-const server = new TaskManagerServer();
-server.run().catch(console.error);
+main().catch(console.error);
