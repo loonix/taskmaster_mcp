@@ -11,6 +11,7 @@ COPY package*.json ./
 COPY tsconfig.json ./
 COPY src ./src
 
+# Install dependencies and build
 RUN npm ci && \
     npm run build && \
     npm prune --production && \
@@ -21,12 +22,14 @@ RUN mkdir -p /app/data && \
     useradd -m taskmaster && \
     chown -R taskmaster:taskmaster /app
 
+# Copy and setup entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh && \
+    chown taskmaster:taskmaster /docker-entrypoint.sh
+
 USER taskmaster
 
 EXPOSE 6274
 EXPOSE 6277
 
-ENV HOST=0.0.0.0
-ENV MCP_INSPECTOR_HOST=0.0.0.0
-
-CMD ["sh", "-c", "mcp-inspector --host 0.0.0.0 build/index.js"]
+CMD ["/docker-entrypoint.sh"]
