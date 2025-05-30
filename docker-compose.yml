@@ -7,9 +7,9 @@ services:
       - "0.0.0.0:6274:6274"  # MCP Inspector UI
       - "0.0.0.0:6277:6277"  # Proxy Server
     volumes:
-      - ./data:/app/data  # Mount data directory for persistent storage
+      - taskdata:/app/data  # Use named volume for data
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 0.0.0.0 6274 && nc -z 0.0.0.0 6277"]
+      test: ["CMD-SHELL", "nc -z 0.0.0.0 6274 && nc -z 0.0.0.0 6277 && test -w /app/data/tasks.json"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -17,3 +17,7 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+    user: taskmaster  # Explicitly set the user
+
+volumes:
+  taskdata:  # Define named volume for persistence

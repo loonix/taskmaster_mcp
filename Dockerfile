@@ -7,10 +7,14 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Create non-root user first
+# Create non-root user and setup directories
 RUN useradd -m taskmaster && \
     mkdir -p /app/data && \
-    chown -R taskmaster:taskmaster /app
+    touch /app/data/tasks.json && \
+    echo "[]" > /app/data/tasks.json && \
+    chown -R taskmaster:taskmaster /app && \
+    chmod 755 /app/data && \
+    chmod 644 /app/data/tasks.json
 
 # Setup npm for non-root user
 ENV NPM_CONFIG_PREFIX=/home/taskmaster/.npm-global
@@ -25,7 +29,6 @@ USER taskmaster
 COPY --chown=taskmaster:taskmaster package*.json ./
 COPY --chown=taskmaster:taskmaster tsconfig.json ./
 COPY --chown=taskmaster:taskmaster src ./src
-COPY --chown=taskmaster:taskmaster data ./data
 
 # Install dependencies, build, and setup inspector
 RUN npm ci && \
@@ -34,16 +37,14 @@ RUN npm ci && \
     npm install -g @modelcontextprotocol/inspector && \
     npm prune --production
 
-# Verify inspector installation
-RUN which mcp-inspector || echo "mcp-inspector not in PATH"
-RUN ls -la /home/taskmaster/.npm-global/bin/mcp-inspector || echo "Not in .npm-global"
-RUN ls -la node_modules/.bin/mcp-inspector || echo "Not in node_modules/.bin"
-
 # Setup entrypoint
 COPY --chown=taskmaster:taskmaster docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 6274
 EXPOSE 6277
+
+# Create a volume for persistent data
+VOLUME /app/data
 
 CMD ["/docker-entrypoint.sh"]
