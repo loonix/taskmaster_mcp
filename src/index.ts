@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SseServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -11,6 +10,7 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { createServer } from 'http';
 
 interface Task {
   id: string;
@@ -242,21 +242,9 @@ class TaskManagerServer {
   }
 
   async run() {
-    let transport;
-    
-    // Check if running in Docker (environment variable set in Dockerfile)
-    if (process.env.DOCKER_ENV === 'true') {
-      transport = new SseServerTransport({
-        host: '0.0.0.0',
-        port: 6277,
-      });
-      console.error('Task Manager MCP server running on SSE transport (port 6277)');
-    } else {
-      transport = new StdioServerTransport();
-      console.error('Task Manager MCP server running on stdio');
-    }
-
+    const transport = new StdioServerTransport();
     await this.server.connect(transport);
+    console.error('Task Manager MCP server running on stdio');
   }
 }
 

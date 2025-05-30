@@ -1,32 +1,22 @@
-version: '3.8'
-
 services:
   taskmaster:
     build: .
     ports:
-      - "0.0.0.0:6274:6274"  # MCP Inspector UI
-      - "0.0.0.0:6277:6277"  # SSE Transport
+      - "6274:6274"  # MCP Inspector UI
+      - "6278:6278"  # HTTP Server
+      - "6277:6277"  # MCP Inspector Proxy
     volumes:
       - taskdata:/app/data  # Use named volume for data
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 0.0.0.0 6274 && nc -z 0.0.0.0 6277 && test -w /app/data/tasks.json"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "nc -z localhost 6274 && nc -z localhost 6278 && nc -z localhost 6277"]
+      interval: 30s
+      timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DOCKER_ENV=true
-      - MCP_INSPECTOR_HOST=0.0.0.0
-      - MCP_SSE_HOST=0.0.0.0
-    user: taskmaster  # Explicitly set the user
-    networks:
-      - mcp_network
-
-networks:
-  mcp_network:
-    driver: bridge
+    user: taskmaster
 
 volumes:
   taskdata:  # Define named volume for persistence
