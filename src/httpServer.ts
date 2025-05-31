@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { spawn } from 'child_process';
+import { parse as parseUrl } from 'url';
 
 const PORT = 6278;
 const HOST = '0.0.0.0';
@@ -9,11 +10,14 @@ const mcp = spawn('node', ['build/index.js'], {
   stdio: ['pipe', 'pipe', process.stderr]
 });
 
+// Store SSE clients
+const clients = new Map<string, ServerResponse>();
+
 // Create HTTP server
 const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // Handle preflight requests
@@ -23,6 +27,39 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
+  const url = parseUrl(req.url || '', true);
+  const sessionId = url.query.sessionId as string;
+
+  // Handle SSE endpoint for events
+  if (req.method === 'GET' && req.url?.startsWith('/events')) {
+    // Set headers for SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+
+    // Send initial connection message
+    res.write('event: connected\ndata: {"status":"connected"}\n\n');
+
+    // Store client connection with session ID if provided
+    if (sessionId) {
+      clients.set(sessionId, res);
+      console.log(`SSE client connected with session ${sessionId}`);
+    }
+
+    // Remove client when connection closes
+    req.on('close', () => {
+      if (sessionId) {
+        clients.delete(sessionId);
+        console.log(`SSE client disconnected: ${sessionId}`);
+      }
+    });
+
+    return;
+  }
+
+  // Handle message endpoint
   if (req.method === 'POST' && req.url === '/message') {
     let body = '';
     
@@ -34,10 +71,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       try {
         // Parse and validate the JSON request
         const parsedBody = JSON.parse(body);
-        if (!parsedBody.method || !parsedBody.jsonrpc || parsedBody.jsonrpc !== '2.0') {
-          throw new Error('Invalid JSON-RPC request');
-        }
-
+        
         // Write the request to MCP's stdin
         mcp.stdin.write(JSON.stringify(parsedBody) + '\n');
 
@@ -58,10 +92,20 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
         mcp.stdout.once('data', (data: Buffer) => {
           clearTimeout(responseTimeout);
           try {
-            // Validate response is proper JSON
-            JSON.parse(data.toString());
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(data);
+            // Parse and validate response
+            const response = JSON.parse(data.toString());
+
+            // Send response via SSE if client is connected
+            const client = sessionId ? clients.get(sessionId) : null;
+            if (client && client.writable) {
+              client.write(`data: ${JSON.stringify(response)}\n\n`);
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'ok' }));
+            } else {
+              // Fall back to direct response if no SSE connection
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(data);
+            }
           } catch (err) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
