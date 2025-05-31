@@ -2,7 +2,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { spawn } from 'child_process';
 import { parse as parseUrl } from 'url';
 
-const PORT = 6278;
+const PORT = 6278;  // Changed back to original port to avoid conflict
 const HOST = '0.0.0.0';
 
 // Create the MCP process
@@ -30,8 +30,10 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   const url = parseUrl(req.url || '', true);
   const sessionId = url.query.sessionId as string;
 
-  // Handle SSE endpoint for events
-  if (req.method === 'GET' && req.url?.startsWith('/events')) {
+  // Handle SSE endpoint
+  if (req.method === 'GET' && url.pathname === '/events') {
+    console.log(`New SSE connection with session ${sessionId}`);
+    
     // Set headers for SSE
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -41,26 +43,32 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
     // Send initial connection message
     res.write('event: connected\ndata: {"status":"connected"}\n\n');
-
-    // Store client connection with session ID if provided
+    
+    // Store client connection
     if (sessionId) {
       clients.set(sessionId, res);
       console.log(`SSE client connected with session ${sessionId}`);
-    }
 
-    // Remove client when connection closes
-    req.on('close', () => {
-      if (sessionId) {
+      // Set up keepalive for SSE connection
+      const keepalive = setInterval(() => {
+        if (res.writable) {
+          res.write(':\n\n'); // SSE comment for keepalive
+        }
+      }, 30000);
+
+      // Remove client when connection closes
+      req.on('close', () => {
         clients.delete(sessionId);
+        clearInterval(keepalive);
         console.log(`SSE client disconnected: ${sessionId}`);
-      }
-    });
+      });
+    }
 
     return;
   }
 
   // Handle message endpoint
-  if (req.method === 'POST' && req.url === '/message') {
+  if (req.method === 'POST' && url.pathname === '/message') {
     let body = '';
     
     req.on('data', (chunk: Buffer) => {
@@ -71,6 +79,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       try {
         // Parse and validate the JSON request
         const parsedBody = JSON.parse(body);
+        console.log('Received request:', parsedBody);
         
         // Write the request to MCP's stdin
         mcp.stdin.write(JSON.stringify(parsedBody) + '\n');
@@ -94,11 +103,14 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
           try {
             // Parse and validate response
             const response = JSON.parse(data.toString());
+            console.log('Sending response:', response);
 
             // Send response via SSE if client is connected
             const client = sessionId ? clients.get(sessionId) : null;
             if (client && client.writable) {
+              // Format as SSE data
               client.write(`data: ${JSON.stringify(response)}\n\n`);
+              // Send acknowledgment to POST request
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ status: 'ok' }));
             } else {

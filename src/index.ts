@@ -1,11 +1,7 @@
 #!/usr/bin/env node
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-
-// Parse command line arguments
-const args = process.argv.slice(2);
-const hostArg = args.find(arg => arg === '--host');
-const hostValue = hostArg && args[args.indexOf(hostArg) + 1];
 
 // Redirect all logging to stderr
 const consoleError = console.error;
@@ -132,6 +128,7 @@ const tools = [
   }
 ];
 
+// Create MCP process handler
 async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcResponse> {
   const { method, params, id } = request;
 
@@ -235,29 +232,25 @@ async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcResponse> 
   }
 }
 
-// Create data directory if it doesn't exist
-if (!fs.existsSync('data')) {
-  fs.mkdirSync('data');
-}
-
-consoleError(`Task Manager MCP server running ${hostValue ? `on ${hostValue}` : ''}`);
-
+// Set up stdin/stdout handler
 process.stdin.setEncoding('utf-8');
 process.stdin.on('data', async (data: string) => {
   try {
     const request = JSON.parse(data) as JsonRpcRequest;
     const response = await handleMessage(request);
     process.stdout.write(JSON.stringify(response) + '\n');
-  } catch (error: any) {
+  } catch (err: any) {
     process.stdout.write(JSON.stringify({
       jsonrpc: '2.0',
       id: null,
       error: {
         code: -32700,
-        message: error.message || 'Parse error'
+        message: err.message || 'Invalid JSON request'
       }
     }) + '\n');
   }
 });
 
+consoleError("Task Manager MCP server running");
+process.stdout.write('\n'); // Initial newline to signal ready
 consoleError("MCP server ready for messages");
