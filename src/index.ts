@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import * as fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 // Redirect console.log to stderr to keep stdout clean for JSON messages
 const log = console.log;
@@ -7,23 +9,101 @@ console.log = (...args) => {
   console.error(...args);
 };
 
-// Define available tools
-interface Tool {
+interface Task {
   id: string;
-  name: string;
   description: string;
+  priority?: 'high' | 'medium' | 'low';
+  status?: 'pending' | 'in-progress' | 'done';
+  dependencies?: string[];
 }
 
-const tools: Tool[] = [
+const TASKS_FILE = 'data/tasks.json';
+
+function loadTasks(): Task[] {
+  if (!fs.existsSync(TASKS_FILE)) {
+    return [];
+  }
+  const data = fs.readFileSync(TASKS_FILE, 'utf-8');
+  return JSON.parse(data);
+}
+
+function saveTasks(tasks: Task[]) {
+  fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+}
+
+const tools = [
   {
-    id: 'list-tasks',
-    name: 'List Tasks',
-    description: 'Lists all tasks'
+    id: 'addTask',
+    name: 'Add Task',
+    description: 'Add a new task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        description: {
+          type: 'string',
+          description: 'Task description'
+        },
+        priority: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description: 'Task priority'
+        }
+      },
+      required: ['description']
+    }
   },
   {
-    id: 'add-task',
-    name: 'Add Task',
-    description: 'Adds a new task'
+    id: 'listTasks',
+    name: 'List Tasks',
+    description: 'List all tasks',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    id: 'updateTask',
+    name: 'Update Task',
+    description: 'Update a task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Task ID'
+        },
+        description: {
+          type: 'string',
+          description: 'New task description'
+        },
+        priority: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description: 'New task priority'
+        },
+        status: {
+          type: 'string',
+          enum: ['pending', 'in-progress', 'done'],
+          description: 'New task status'
+        }
+      },
+      required: ['id']
+    }
+  },
+  {
+    id: 'deleteTask',
+    name: 'Delete Task',
+    description: 'Delete a task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Task ID'
+        }
+      },
+      required: ['id']
+    }
   }
 ];
 
@@ -82,18 +162,76 @@ async function main() {
           }
 
           switch (toolId) {
-            case 'list-tasks':
+            case 'listTasks':
+              const tasks = loadTasks();
               result = {
                 ...response,
-                result: { tasks: [] }
+                result: { tasks }
               };
               break;
-            case 'add-task':
+
+            case 'addTask': 
+              const newTask: Task = {
+                id: uuidv4(),
+                description: params.description,
+                priority: params.priority || 'medium',
+                status: 'pending',
+                dependencies: []
+              };
+              const currentTasks = loadTasks();
+              currentTasks.push(newTask);
+              saveTasks(currentTasks);
+              result = {
+                ...response,
+                result: { task: newTask }
+              };
+              break;
+
+            case 'updateTask':
+              const taskList = loadTasks();
+              const taskIndex = taskList.findIndex(t => t.id === params.id);
+              if (taskIndex === -1) {
+                result = {
+                  ...response,
+                  error: {
+                    code: -32602,
+                    message: `Task ${params.id} not found`
+                  }
+                };
+                break;
+              }
+              const updatedTask = {
+                ...taskList[taskIndex],
+                ...params
+              };
+              taskList[taskIndex] = updatedTask;
+              saveTasks(taskList);
+              result = {
+                ...response,
+                result: { task: updatedTask }
+              };
+              break;
+
+            case 'deleteTask':
+              const allTasks = loadTasks();
+              const filteredTasks = allTasks.filter(t => t.id !== params.id);
+              if (filteredTasks.length === allTasks.length) {
+                result = {
+                  ...response,
+                  error: {
+                    code: -32602,
+                    message: `Task ${params.id} not found`
+                  }
+                };
+                break;
+              }
+              saveTasks(filteredTasks);
               result = {
                 ...response,
                 result: { success: true }
               };
               break;
+
             default:
               result = {
                 ...response,

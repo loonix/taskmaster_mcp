@@ -18,11 +18,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
-    "uuid": "^11.1.0"
+    "@types/uuid": "^8.3.2",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
-    "@types/uuid": "^9.0.8",
     "typescript": "^5.3.3"
   },
   "engines": {
