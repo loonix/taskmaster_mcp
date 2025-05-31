@@ -1,12 +1,20 @@
 #!/usr/bin/env node
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
-// Redirect console.log to stderr to keep stdout clean for JSON messages
-const log = console.log;
+// Parse command line arguments
+const args = process.argv.slice(2);
+const hostArg = args.find(arg => arg === '--host');
+const hostValue = hostArg && args[args.indexOf(hostArg) + 1];
+
+// Redirect all logging to stderr
+const consoleError = console.error;
+
 console.log = (...args) => {
-  console.error(...args);
+  consoleError(...args);
+};
+console.error = (...args) => {
+  consoleError(...args);
 };
 
 interface Task {
@@ -15,6 +23,23 @@ interface Task {
   priority?: 'high' | 'medium' | 'low';
   status?: 'pending' | 'in-progress' | 'done';
   dependencies?: string[];
+}
+
+interface JsonRpcRequest {
+  jsonrpc: '2.0';
+  id: string | number;
+  method: string;
+  params?: any;
+}
+
+interface JsonRpcResponse {
+  jsonrpc: '2.0';
+  id: string | number;
+  result?: any;
+  error?: {
+    code: number;
+    message: string;
+  };
 }
 
 const TASKS_FILE = 'data/tasks.json';
@@ -107,169 +132,132 @@ const tools = [
   }
 ];
 
-async function main() {
-  log("Task Manager MCP server running on stdio");
-  
-  process.stdin.setEncoding('utf-8');
-  process.stdin.on('data', (data: string) => {
-    try {
-      const message = JSON.parse(data);
-      const { method, params, id } = message;
-      const response = {
-        jsonrpc: '2.0',
-        id
-      };
+async function handleMessage(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+  const { method, params, id } = request;
 
-      let result;
+  try {
+    let result;
 
-      switch (method) {
-        case 'initialize':
-          result = {
-            ...response,
-            result: {
-              protocolVersion: '2024-11-05',
-              serverInfo: {
-                name: 'ai-taskmaster',
-                version: '1.0.0'
-              },
-              capabilities: {
-                tools: {}
-              }
-            }
-          };
-          break;
-
-        case 'listTools':
-          result = {
-            ...response,
-            result: { tools }
-          };
-          break;
-
-        case 'callTool':
-          const toolId = params?.toolId;
-          const tool = tools.find(t => t.id === toolId);
-          
-          if (!tool) {
-            result = {
-              ...response,
-              error: {
-                code: -32601,
-                message: `Tool ${toolId} not found`
-              }
-            };
-            break;
+    switch (method) {
+      case 'initialize':
+        result = {
+          protocolVersion: '2024-11-05',
+          serverInfo: {
+            name: 'ai-taskmaster',
+            version: '1.0.0'
+          },
+          capabilities: {
+            tools: {}
           }
+        };
+        break;
 
-          switch (toolId) {
-            case 'listTasks':
-              const tasks = loadTasks();
-              result = {
-                ...response,
-                result: { tasks }
-              };
-              break;
+      case 'listTools':
+        result = { tools };
+        break;
 
-            case 'addTask': 
-              const newTask: Task = {
-                id: uuidv4(),
-                description: params.description,
-                priority: params.priority || 'medium',
-                status: 'pending',
-                dependencies: []
-              };
-              const currentTasks = loadTasks();
-              currentTasks.push(newTask);
-              saveTasks(currentTasks);
-              result = {
-                ...response,
-                result: { task: newTask }
-              };
-              break;
-
-            case 'updateTask':
-              const taskList = loadTasks();
-              const taskIndex = taskList.findIndex(t => t.id === params.id);
-              if (taskIndex === -1) {
-                result = {
-                  ...response,
-                  error: {
-                    code: -32602,
-                    message: `Task ${params.id} not found`
-                  }
-                };
-                break;
-              }
-              const updatedTask = {
-                ...taskList[taskIndex],
-                ...params
-              };
-              taskList[taskIndex] = updatedTask;
-              saveTasks(taskList);
-              result = {
-                ...response,
-                result: { task: updatedTask }
-              };
-              break;
-
-            case 'deleteTask':
-              const allTasks = loadTasks();
-              const filteredTasks = allTasks.filter(t => t.id !== params.id);
-              if (filteredTasks.length === allTasks.length) {
-                result = {
-                  ...response,
-                  error: {
-                    code: -32602,
-                    message: `Task ${params.id} not found`
-                  }
-                };
-                break;
-              }
-              saveTasks(filteredTasks);
-              result = {
-                ...response,
-                result: { success: true }
-              };
-              break;
-
-            default:
-              result = {
-                ...response,
-                error: {
-                  code: -32601,
-                  message: `Tool ${toolId} not implemented`
-                }
-              };
-          }
-          break;
-
-        default:
-          result = {
-            ...response,
-            error: {
-              code: -32601,
-              message: `Method ${method} not found`
-            }
-          };
-      }
-
-      process.stdout.write(JSON.stringify(result) + '\n');
-    } catch (error: any) {
-      process.stdout.write(JSON.stringify({
-        jsonrpc: '2.0',
-        id: null,
-        error: {
-          code: -32700,
-          message: error.message || 'Parse error'
+      case 'callTool':
+        const toolId = params?.toolId;
+        const tool = tools.find(t => t.id === toolId);
+        
+        if (!tool) {
+          throw new Error(`Tool ${toolId} not found`);
         }
-      }) + '\n');
-    }
-  });
 
-  log("MCP server ready for messages");
+        switch (toolId) {
+          case 'listTasks':
+            const tasks = loadTasks();
+            result = { tasks };
+            break;
+
+          case 'addTask': 
+            const newTask: Task = {
+              id: uuidv4(),
+              description: params.description,
+              priority: params.priority || 'medium',
+              status: 'pending',
+              dependencies: []
+            };
+            const currentTasks = loadTasks();
+            currentTasks.push(newTask);
+            saveTasks(currentTasks);
+            result = { task: newTask };
+            break;
+
+          case 'updateTask':
+            const taskList = loadTasks();
+            const taskIndex = taskList.findIndex(t => t.id === params.id);
+            if (taskIndex === -1) {
+              throw new Error(`Task ${params.id} not found`);
+            }
+            const updatedTask = {
+              ...taskList[taskIndex],
+              ...params
+            };
+            taskList[taskIndex] = updatedTask;
+            saveTasks(taskList);
+            result = { task: updatedTask };
+            break;
+
+          case 'deleteTask':
+            const allTasks = loadTasks();
+            const filteredTasks = allTasks.filter(t => t.id !== params.id);
+            if (filteredTasks.length === allTasks.length) {
+              throw new Error(`Task ${params.id} not found`);
+            }
+            saveTasks(filteredTasks);
+            result = { success: true };
+            break;
+
+          default:
+            throw new Error(`Tool ${toolId} not implemented`);
+        }
+        break;
+
+      default:
+        throw new Error(`Method ${method} not found`);
+    }
+
+    return {
+      jsonrpc: '2.0',
+      id,
+      result
+    };
+  } catch (error: any) {
+    return {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: -32000,
+        message: error.message || 'Unknown error'
+      }
+    };
+  }
 }
 
-main().catch(error => {
-  log("Fatal error:", error);
-  process.exit(1);
+// Create data directory if it doesn't exist
+if (!fs.existsSync('data')) {
+  fs.mkdirSync('data');
+}
+
+consoleError(`Task Manager MCP server running ${hostValue ? `on ${hostValue}` : ''}`);
+
+process.stdin.setEncoding('utf-8');
+process.stdin.on('data', async (data: string) => {
+  try {
+    const request = JSON.parse(data) as JsonRpcRequest;
+    const response = await handleMessage(request);
+    process.stdout.write(JSON.stringify(response) + '\n');
+  } catch (error: any) {
+    process.stdout.write(JSON.stringify({
+      jsonrpc: '2.0',
+      id: null,
+      error: {
+        code: -32700,
+        message: error.message || 'Parse error'
+      }
+    }) + '\n');
+  }
 });
+
+consoleError("MCP server ready for messages");
