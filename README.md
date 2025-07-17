@@ -2,6 +2,9 @@
 
 This is a Model Context Protocol (MCP) server that provides task management functionality.
 
+Join my discord channel: https://discord.gg/8pem5GAe
+
+
 Models Tested:
 - Claude 3.5
 - mychen76/qwen3_cline_roocode:32b (local with ollama)
